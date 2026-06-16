@@ -329,30 +329,59 @@ function parseDoc(file, cb) {
 }
 
 function extractInfo(txt, fname) {
-  // Remove spaces between CJK chars (artifact of binary scanning)
-  var cleanTxt = txt.replace(/([一-鿿])\s+([一-鿿])/g, '$1$2');
-  cleanTxt = cleanTxt.replace(/([一-鿿])\s+([一-鿿])/g, '$1$2');
-  // Try 【】first, then fallback
-  var cm = cleanTxt.match(/【([^】]{2,15})】/);
-  var cm2 = cleanTxt.match(/訂購人[\s\/／公司（()發票抬頭)]*([\u4e00-\u9fff]{2,10})/);
-  var cn = cm ? cm[1].trim().replace(/^[A-Z0-9]+\s*/, '') : cm2 ? cm2[1].trim() : fname.replace(/\.docx?$/i, '');
-  var dm = txt.match(/發送日期[\/时時間]*\s*([\d\/\.]+)/);
+  // Clean up spaces between Chinese characters from binary scanning
+  var cleanTxt = txt;
+  for (var i = 0; i < 5; i++) {
+    cleanTxt = cleanTxt.replace(/([一-鿿＀-￯]) ([一-鿿＀-￯])/g, '$1$2');
+  }
+  // Try to find client name in 【】brackets
+  var cn = '';
+  var bracketMatch = cleanTxt.match(/【([^】]{2,15})】/) ||
+                     cleanTxt.match(/［([^］]{2,15})］/) ||
+                     cleanTxt.match(/【([^】]{2,15})】/);
+  if (bracketMatch) {
+    cn = bracketMatch[1].trim().replace(/^[A-Z0-9]+\s*/, '');
+  }
+  // Fallback: find name after 訂購人
+  if (!cn) {
+    var orderMatch = cleanTxt.match(/訂購人.{0,30}([一-鿿]{2,10})/);
+    if (orderMatch) cn = orderMatch[1].trim();
+  }
+  if (!cn) cn = fname.replace(/\.docx?$/i, '');
+
+  // Extract send date
   var sd = '';
-  if (dm) {
-    var raw = dm[1]; var mm = raw.match(/(\d+)\/(\d+)/);
+  var dateMatch = cleanTxt.match(/發送日期.{0,5}([\d\/\.]+)/);
+  if (dateMatch) {
+    var raw = dateMatch[1];
+    var mm = raw.match(/(\d+)\/(\d+)/);
     if (mm) {
       var mo = mm[1];
-      var days = raw.replace(/[^\d\.]/g, '.').split('.').filter(Boolean);
+      var days = raw.replace(/[^\d\.]/g, '.').split('.').filter(function(x){return x;});
       sd = days.length >= 2 ? mo + '/' + days[0] + '-' + mo + '/' + days[days.length-1] : mo + '/' + days[0];
     }
   }
-  if (!sd) { var fn = fname.match(/(\d{4}-\d{4})/); sd = fn ? fn[1] : ''; }
+  if (!sd) { var fnMatch = fname.match(/(\d{4}-\d{4})/); sd = fnMatch ? fnMatch[1] : ''; }
+
+  // Extract used keys
   var ks = [];
-  (txt.match(/AA\d+_MK-DM\d+_\d+_\d+/g) || []).forEach(function(id) { ks.push({tel: '遠傳', id: id, city: ''}); });
-  var twdMs = txt.matchAll ? [...txt.matchAll(/MM(\d+)\s*([\u4e00-\u9fff]{2,5}[市縣][\u4e00-\u9fff]*)/g)] : [];
-  twdMs.forEach(function(m) { ks.push({tel: '台哥大', id: 'MM' + m[1], city: m[2]}); });
-  var chtMs = txt.matchAll ? [...txt.matchAll(/(?<![A-Z])(\d{7}_[\w\u4e00-\u9fff()\-]+)\s*([\u4e00-\u9fff]{2,4}[市縣][\u4e00-\u9fff]*)?/g)] : [];
-  chtMs.forEach(function(m) { var id = m[1].trim(); var city = m[2] ? m[2].trim() : ''; if (id && !id.includes('MK-DM')) ks.push({tel: '中華', id: id, city: city}); });
+  var fetMatches = cleanTxt.match(/AA\d+_MK-DM\d+_\d+_\d+/g) || [];
+  fetMatches.forEach(function(id) { ks.push({tel: '遠傳', id: id, city: ''}); });
+
+  var twdRe = /MM(\d+)\s*([一-鿿]{2,5}[市縣][一-鿿]*)/g;
+  var twdM;
+  while ((twdM = twdRe.exec(cleanTxt)) !== null) {
+    ks.push({tel: '台哥大', id: 'MM' + twdM[1], city: twdM[2]});
+  }
+
+  var chtRe = /(?:^|[^A-Z])(\d{7}_[\w一-鿿()\-]+)\s*([一-鿿]{2,4}[市縣][一-鿿]*)?/g;
+  var chtM;
+  while ((chtM = chtRe.exec(cleanTxt)) !== null) {
+    var id = chtM[1].trim();
+    var city = chtM[2] ? chtM[2].trim() : '';
+    if (id && id.indexOf('MK-DM') < 0) ks.push({tel: '中華', id: id, city: city});
+  }
+
   return {cn: cn, sd: sd, ks: ks};
 }
 
@@ -525,8 +554,10 @@ function exportExcel() {
   if (!rawWb) { showToast('請先上傳電信Excel'); return; }
   if (!currentClient) { showToast('請先選擇客戶'); return; }
   var cs = getUsedSet(currentClient);
-  var wb = XLSX_LIB.read(rawWb, {type: 'array', cellStyles: true});
-  var RED = 'FFFF9999';
+  if (cs.size === 0) { showToast('此客戶沒有已使用的數據'); return; }
+  var wb = XLSX_LIB.read(rawWb, {type: 'array'});
+  var RED_FILL = {fgColor: {rgb: 'FFFF9999'}, patternType: 'solid'};
+  var RED_FONT = {color: {rgb: 'FF990000'}};
   ['中華--借貸', '台哥大--借貸', '遠傳--借貸'].forEach(function(sn) {
     var ws = wb.Sheets[sn]; if (!ws) return;
     var range = XLSX_LIB.utils.decode_range(ws['!ref'] || 'A1');
@@ -539,21 +570,26 @@ function exportExcel() {
     }
     if (ic < 0) return;
     var tel = sn.indexOf('中華') >= 0 ? '中華' : sn.indexOf('台哥大') >= 0 ? '台哥大' : '遠傳';
+    var markedCount = 0;
     for (var row = 1; row <= range.e.r; row++) {
       var iC = ws[XLSX_LIB.utils.encode_cell({r: row, c: ic})];
       var cC = ws[XLSX_LIB.utils.encode_cell({r: row, c: cc})];
       if (!iC || !iC.v) continue;
       var rd = {tel: tel, id: String(iC.v).trim(), city: cC ? String(cC.v || '').trim() : ''};
       if (!isUsed(rd, cs)) continue;
+      markedCount++;
       for (var col = range.s.c; col <= range.e.c; col++) {
         var addr = XLSX_LIB.utils.encode_cell({r: row, c: col});
         if (!ws[addr]) ws[addr] = {t: 's', v: ''};
-        ws[addr].s = {fill: {fgColor: {rgb: RED}, patternType: 'solid'}, font: {color: {rgb: 'FF990000'}}};
+        if (!ws[addr].s) ws[addr].s = {};
+        ws[addr].s.fill = RED_FILL;
+        ws[addr].s.font = RED_FONT;
       }
     }
+    console.log(sn + ' marked ' + markedCount + ' rows');
   });
   var bn = baseName(currentClient);
-  XLSX_LIB.writeFile(wb, '電信數據_' + bn + '_' + todayStr().replace(/\//g, '-') + '.xlsx', {cellStyles: true});
+  XLSX_LIB.writeFile(wb, '電信數據_' + bn + '_' + todayStr().replace(/\//g, '-') + '.xlsx', {cellStyles: true, bookSST: false});
   showToast('✓ 已匯出標記Excel');
 }
 
