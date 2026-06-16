@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>電信數據管理系統</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Microsoft JhengHei',sans-serif;background:#f5f4f0;color:#1a1a1a;font-size:14px}
+
+/* ── Topbar ── */
+.topbar{background:#1a1a1a;color:#fff;padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between}
+.topbar-title{font-size:15px;font-weight:500}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.api-status{font-size:12px;display:flex;align-items:center;gap:5px}
+.api-dot{width:7px;height:7px;border-radius:50%;background:#666}
+.api-dot.connected{background:#22c55e}
+.api-input{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:5px 10px;color:#fff;font-size:12px;width:320px;outline:none}
+.api-input::placeholder{color:#888}
+.api-input:focus{border-color:rgba(255,255,255,0.5)}
+.btn-sm{padding:5px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:#fff;font-size:12px;cursor:pointer;font-family:inherit}
+.btn-sm:hover{background:rgba(255,255,255,0.1)}
+
+/* ── Layout ── */
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 52px)}
+
+/* ── Sidebar ── */
+.sidebar{background:#fff;border-right:1px solid #e8e8e8;padding:16px;display:flex;flex-direction:column;gap:6px;overflow-y:auto}
+.sidebar-section{font-size:11px;font-weight:600;color:#999;letter-spacing:.08em;text-transform:uppercase;margin:10px 0 4px}
+.upload-zone{border:1.5px dashed #d0d0d0;border-radius:10px;padding:14px;text-align:center;cursor:pointer;position:relative;background:#fafaf8;transition:all .15s}
+.upload-zone:hover{border-color:#1a1a1a;background:#f5f4f0}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.upload-icon{font-size:22px;margin-bottom:4px}
+.upload-text{font-size:12px;color:#666;line-height:1.4}
+.upload-text strong{color:#1a1a1a;display:block;margin-bottom:2px}
+.file-pill{background:#f0f0ec;border-radius:6px;padding:5px 10px;font-size:12px;display:flex;align-items:center;gap:6px;margin-top:4px}
+.pill-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0}
+.pill-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#444}
+
+.client-list{display:flex;flex-direction:column;gap:2px}
+.client-item{padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .1s}
+.client-item:hover{background:#f5f4f0}
+.client-item.active{background:#1a1a1a;color:#fff}
+.c-avatar{width:28px;height:28px;border-radius:50%;background:#e8e4ff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#5b45c4;flex-shrink:0}
+.client-item.active .c-avatar{background:rgba(255,255,255,0.15);color:#fff}
+.c-name{font-size:13px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c-meta{font-size:11px;color:#999}
+.client-item.active .c-meta{color:#aaa}
+
+/* ── Main ── */
+.main{padding:24px;overflow:auto}
+.page-header{margin-bottom:18px;display:flex;align-items:flex-start;justify-content:space-between}
+.page-header h1{font-size:20px;font-weight:600}
+.page-header p{font-size:13px;color:#666;margin-top:3px}
+
+/* ── Stats ── */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.stat-card{background:#fff;border-radius:10px;padding:12px 14px;border:1px solid #eee}
+.stat-label{font-size:11px;color:#999;margin-bottom:3px}
+.stat-value{font-size:20px;font-weight:600}
+.green{color:#16a34a}.red{color:#dc2626}.blue{color:#2563eb}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:2px;background:#f0f0ec;border-radius:8px;padding:3px;width:fit-content;margin-bottom:12px}
+.tab-btn{padding:5px 13px;border-radius:6px;border:none;background:none;font-size:13px;cursor:pointer;color:#666;font-family:inherit;transition:all .1s}
+.tab-btn.active{background:#fff;color:#1a1a1a;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+
+/* ── Toolbar ── */
+.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.toolbar select,.toolbar input{border:1px solid #e0e0e0;border-radius:7px;padding:6px 10px;font-size:13px;background:#fff;outline:none}
+.toolbar input{flex:1;min-width:140px}
+.toolbar select:focus,.toolbar input:focus{border-color:#1a1a1a}
+
+/* ── Table ── */
+.table-wrap{background:#fff;border-radius:10px;border:1px solid #eee;overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:9px 14px;font-size:11px;font-weight:600;color:#999;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid #f0f0ec;background:#fafaf8}
+td{padding:9px 14px;border-bottom:1px solid #f5f5f2;color:#1a1a1a}
+tr:last-child td{border-bottom:none}
+tr.used-row td{color:#bbb}
+tr.used-row td.id-cell{text-decoration:line-through;text-decoration-color:#ddd}
+tr:hover td{background:#fafaf8}
+
+/* ── Badges ── */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:500}
+.b-cht{background:#dbeafe;color:#1d4ed8}
+.b-twd{background:#fef9c3;color:#854d0e}
+.b-fet{background:#dcfce7;color:#166534}
+.b-good{background:#dcfce7;color:#166534}
+.b-bad{background:#fee2e2;color:#991b1b}
+.b-note{background:#f3e8ff;color:#7e22ce}
+.status-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px}
+.dot-g{background:#22c55e}.dot-r{background:#ef4444}
+
+/* ── Buttons ── */
+.btn{padding:7px 14px;border-radius:7px;border:1px solid #e0e0e0;background:#fff;font-size:13px;cursor:pointer;font-family:inherit;color:#1a1a1a;transition:all .1s}
+.btn:hover{background:#f5f4f0}
+.btn-dark{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.btn-dark:hover{background:#333}
+.btn-icon{padding:5px 10px;font-size:12px}
+.btn-red{border-color:#fca5a5;color:#dc2626}
+.btn-red:hover{background:#fee2e2}
+
+/* ── Section cards ── */
+.section-card{background:#fff;border-radius:10px;border:1px solid #eee;padding:16px;margin-bottom:16px}
+.section-card h3{font-size:13px;font-weight:600;color:#555;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+
+/* ── Order list ── */
+.order-item{background:#fafaf8;border-radius:7px;padding:8px 12px;display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:4px}
+.order-date{color:#999;white-space:nowrap;flex-shrink:0}
+.order-name{flex:1;color:#444;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.order-count{color:#666;white-space:nowrap}
+.icon-btn{background:none;border:none;cursor:pointer;color:#ccc;padding:2px 6px;border-radius:4px;font-size:13px}
+.icon-btn:hover{color:#ef4444;background:#fee2e2}
+
+/* ── Feedback modal ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;border-radius:14px;padding:24px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.modal h2{font-size:16px;font-weight:600;margin-bottom:16px}
+.form-group{margin-bottom:14px}
+.form-label{font-size:12px;font-weight:500;color:#555;margin-bottom:6px;display:block}
+.form-input{width:100%;border:1px solid #e0e0e0;border-radius:7px;padding:8px 10px;font-size:13px;outline:none;font-family:inherit}
+.form-input:focus{border-color:#1a1a1a}
+textarea.form-input{resize:vertical;min-height:80px}
+.rating-row{display:flex;gap:8px}
+.rating-btn{flex:1;padding:8px;border-radius:7px;border:1.5px solid #e0e0e0;background:#fff;cursor:pointer;font-size:13px;font-family:inherit;transition:all .1s}
+.rating-btn.good.selected{background:#dcfce7;border-color:#16a34a;color:#16a34a;font-weight:500}
+.rating-btn.bad.selected{background:#fee2e2;border-color:#dc2626;color:#dc2626;font-weight:500}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+
+/* ── Empty & Toast ── */
+.empty{text-align:center;padding:40px 20px;color:#aaa}
+.empty-icon{font-size:36px;margin-bottom:10px}
+.empty-title{font-size:15px;color:#555;font-weight:500;margin-bottom:5px}
+.empty-desc{font-size:13px;line-height:1.5}
+.toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;color:#fff;padding:11px 16px;border-radius:8px;font-size:13px;z-index:999;opacity:0;transform:translateY(6px);transition:all .2s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.loading{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Setup guide ── */
+.setup-card{background:#fff;border-radius:14px;border:1px solid #eee;padding:28px;max-width:560px;margin:0 auto}
+.setup-step{display:flex;gap:14px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #f0f0f0}
+.setup-step:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.step-num{width:28px;height:28px;border-radius:50%;background:#1a1a1a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0}
+.step-content h4{font-size:14px;font-weight:600;margin-bottom:4px}
+.step-content p{font-size:13px;color:#666;line-height:1.5}
+.code-block{background:#f5f4f0;border-radius:6px;padding:8px 12px;font-size:11px;font-family:monospace;color:#333;margin-top:6px;word-break:break-all}
+
+/* ── View toggle ── */
+.view-toggle{display:flex;gap:2px;background:#f0f0ec;border-radius:8px;padding:3px;width:fit-content}
+.view-btn{padding:5px 13px;border-radius:6px;border:none;background:none;font-size:13px;cursor:pointer;color:#666;font-family:inherit}
+.view-btn.active{background:#fff;color:#1a1a1a;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="topbar-title">📡 電信數據管理系統</span>
+  <div class="topbar-right">
+    <button class="btn-sm" onclick="exportRecords()">📤 匯出紀錄</button>
+    <label class="btn-sm" style="cursor:pointer">📥 匯入紀錄<input type="file" accept=".json" style="display:none" onchange="importRecords(this)"></label>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-section">電信數據</div>
+    <div class="upload-zone">
+      <input type="file" accept=".xlsx,.xls" onchange="loadExcel(this)">
+      <div class="upload-icon">📊</div>
+      <div class="upload-text"><strong>上傳電信 Excel</strong>三家電信合併總表</div>
+    </div>
+    <div id="excel-pill"></div>
+
+    <div class="sidebar-section" style="margin-top:6px">上傳訂單</div>
+    <div class="upload-zone">
+      <input type="file" accept=".docx,.doc" multiple onchange="loadWords(this)">
+      <div class="upload-icon">📄</div>
+      <div class="upload-text"><strong>丟入 Word 訂單</strong>自動辨識客戶，可多選</div>
+    </div>
+    <div id="word-pills"></div>
+
+    <div class="sidebar-section" style="margin-top:6px">客戶列表</div>
+    <div class="client-list" id="client-list">
+      <div style="font-size:12px;color:#bbb;padding:8px 4px">上傳訂單後自動建立</div>
+    </div>
+  </div>
+
+  <div class="main" id="main">
+    <div id="setup-view"></div>
+    <div id="main-content"></div>
+  </div>
+</div>
+
+<!-- Feedback Modal -->
+<div class="overlay" id="feedback-modal" style="display:none">
+  <div class="modal">
+    <h2>📝 新增客戶反饋</h2>
+    <div style="background:#f5f4f0;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#555" id="feedback-target"></div>
+    <div class="form-group">
+      <label class="form-label">評價</label>
+      <div class="rating-row">
+        <button class="rating-btn good" id="btn-good" onclick="selectRating('好')">👍 效果好</button>
+        <button class="rating-btn bad" id="btn-bad" onclick="selectRating('差')">👎 效果差</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">備註（選填）</label>
+      <textarea class="form-input" id="feedback-note" placeholder="例如：轉換率高、客戶不喜歡這區域..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeFeedback()">取消</button>
+      <button class="btn btn-dark" onclick="submitFeedback()">儲存反饋</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══ State ═══════════════════════════════════════════
+let allData = [];
+let rawWorkbookData = null; // stores original Excel file bytes
+let clients = {};    // {name: {orders:[{filename,date,usedKeys:[]}]}}
+let feedback = [];   // [{clientName,telecom,id,city,rating,note,date,rowIndex}]
+let currentClient = null;
+let currentTab = 'all';
+let usedViewMode = 'client'; // 'client' | 'all'
+let currentPage = 1;
+const PAGE_SIZE = 100;
+let searchKeyword = '';
+let searchKeyword = '';
+let feedbackTarget = null;
+let feedbackRating = '';
+let isConnected = false;
+
+// ═══ Init ════════════════════════════════════════════
+window.onload = () => {
+  // Load saved records from localStorage
+  const saved = localStorage.getItem('telecom_records');
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      clients = data.clients || {};
+      feedback = data.feedback || [];
+      const names = Object.keys(clients);
+      if (names.length) currentClient = names[0];
+    } catch(e) {}
+  }
+  renderClientList();
+  renderMain();
+};
+
+function saveRecords() {
+  localStorage.setItem('telecom_records', JSON.stringify({ clients, feedback }));
+}
+
+function exportRecords() {
+  const data = JSON.stringify({ clients, feedback }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '電信紀錄_' + todayStr().replace(/\//g,'-') + '.json';
+  a.click();
+  showToast('✓ 紀錄已匯出，請存到 Google 雲端硬碟');
+}
+
+function importRecords(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      clients = data.clients || {};
+      feedback = data.feedback || [];
+      const names = Object.keys(clients);
+      if (names.length) currentClient = names[0];
+      saveRecords();
+      renderClientList();
+      renderMain();
+      showToast('✓ 紀錄已匯入！');
+    } catch(e) { showToast('匯入失敗：' + e.message); }
+  };
+  reader.readAsText(file);
+}
+
+// ═══ API ═════════════════════════════════════════════
+
+
+
+
+// ═══ Load Excel ══════════════════════════════════════
+function loadExcel(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      rawWorkbookData = e.target.result; // save original
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const map = { '中華--借貸': '中華', '台哥大--借貸': '台哥大', '遠傳--借貸': '遠傳' };
+      allData = [];
+      Object.entries(map).forEach(([sname, tel]) => {
+        if (!wb.SheetNames.includes(sname)) return;
+        XLSX.utils.sheet_to_json(wb.Sheets[sname], { defval: '' }).forEach(r => {
+          const id = String(r['特篩編號'] || r['檔名'] || '').trim();
+          const city = String(r['基本/帳址'] || r['基本帳址'] || '').trim();
+          if (!id || !city) return;
+          const fname = String(r['檔名'] || '').trim();
+          const sendDate = String(r['發送日期'] || '').trim();
+          allData.push({ id, fname, telecom: tel, city, industry: String(r['產業']||'').trim(), count: parseInt(r['數據'])||0, sendDate });
+        });
+      });
+      document.getElementById('excel-pill').innerHTML =
+        `<div class="file-pill"><span class="pill-dot"></span><span class="pill-name">${file.name} (${allData.length} 筆)</span></div>`;
+      renderMain();
+      showToast(`✓ 讀取 ${allData.length} 筆數據`);
+    } catch(e) { showToast('Excel 讀取失敗：' + e.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ═══ Load Words ══════════════════════════════════════
+async function loadWords(input) {
+  const files = Array.from(input.files);
+  if (!files.length) { showToast('沒有選到檔案'); return; }
+  const pillsEl = document.getElementById('word-pills');
+  pillsEl.innerHTML = '<div class="file-pill"><span style="color:#888;font-size:12px">⏳ 解析中...</span></div>';
+  let totalOrders = [];
+
+  for (const file of files) {
+    try {
+      showToast(`⏳ 解析：${file.name}`);
+      const { clientName, sendDate, usedKeys } = await parseDocx(file);
+      if (!clients[clientName]) clients[clientName] = { orders: [] };
+      const date = todayStr();
+      const orderLabel = sendDate || date;
+      const key = clientName + '|' + (sendDate || file.name);
+      if (!clients[clientName].orders.find(o => o.key === key)) {
+        clients[clientName].orders.push({ key, filename: file.name, date, sendDate: orderLabel, usedKeys, rowIndices: [] });
+      }
+      if (!currentClient) currentClient = clientName;
+
+      // Collect for Sheets
+      usedKeys.forEach(k => totalOrders.push({ clientName, filename: file.name, telecom: k.telecom, id: k.id, city: k.city, count: k.count || '' }));
+
+      pillsEl.innerHTML += `<div class="file-pill"><span class="pill-dot"></span><span class="pill-name">${file.name} → ${clientName} (${usedKeys.length} 筆)</span></div>`;
+
+
+    } catch(e) {
+      pillsEl.innerHTML += `<div class="file-pill"><span style="color:#dc2626">❌ ${file.name}：${e.message}</span></div>`;
+      showToast('❌ ' + file.name + ' 解析失敗：' + e.message);
+      console.error(e);
+    }
+  }
+
+  saveRecords();
+  renderClientList();
+  renderMain();
+  showToast(`✓ 已載入 ${files.length} 份訂單，紀錄已自動儲存`);
+}
+
+async function parseDocx(file) {
+  const isDoc = file.name.toLowerCase().endsWith('.doc');
+  let fullText = '';
+
+  if (isDoc) {
+    // .doc is UTF-16LE encoded binary
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint16Array(buf); let decoded = ''; for (let i = 0; i < bytes.length; i++) { const c = bytes[i]; if (c > 0x001f) decoded += String.fromCharCode(c); }
+    const chunks = decoded.match(/[\x20-\x7e\u4e00-\u9fff\uff00-\uffef\u3000-\u303f\uff01-\uff60]{2,}/g) || [];
+    fullText = chunks.join(' ');
+  } else {
+    // .docx: standard ZIP/XML parsing
+    const buf = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(buf);
+    const xmlStr = await zip.file('word/document.xml').async('string');
+    const textNodes = xmlStr.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+    fullText = textNodes.map(n => n.replace(/<[^>]+>/g, '')).join(' ');
+  }
+
+  // Client name from 【...】
+  const cm = fullText.match(/【([^】]+)】/);
+  const cm2 = fullText.match(/訂購人[\s/／公司]*([\u4e00-\u9fff\w]{2,10})/);
+  let clientName = cm ? cm[1].trim().replace(/^[A-Z0-9]+\s*/, '') 
+    : cm2 ? cm2[1].trim()
+    : file.name.replace(/\.docx?$/i,'');
+
+  // Extract send date range from 發送日期 field
+  const dateMatch = fullText.match(/發送日期[／时時間]*\s*([\d/\.]+)/);
+  let sendDate = '';
+  if (dateMatch) {
+    // e.g. "5/18.19.20.21.22" -> extract first and last day
+    const raw = dateMatch[1].trim();
+    const monthMatch = raw.match(/(\d+)\/(\d+)/);
+    if (monthMatch) {
+      const month = monthMatch[1];
+      const days = raw.replace(/[^\d\.]/g, '.').split('.').filter(Boolean);
+      if (days.length >= 2) {
+        sendDate = `${month}/${days[0]}-${month}/${days[days.length-1]}`;
+      } else if (days.length === 1) {
+        sendDate = `${month}/${days[0]}`;
+      }
+    }
+  }
+  // fallback to file name date if no date found
+  if (!sendDate) {
+    const fnDate = file.name.match(/(\d{4}-\d{4})/);
+    sendDate = fnDate ? fnDate[1] : '';
+  }
+
+  const usedKeys = [];
+  // 遠傳
+  (fullText.match(/AA\d+_MK-DM\d+_\d+_\d+/g)||[]).forEach(id => usedKeys.push({ telecom:'遠傳', id, city:'' }));
+  // 台哥大
+  [...fullText.matchAll(/MM(\d+)\s*([\u4e00-\u9fff]{2,5}[市縣][\u4e00-\u9fff]*)/g)].forEach(m =>
+    usedKeys.push({ telecom:'台哥大', id:'MM'+m[1], city:m[2] }));
+  // 中華
+  // 中華: 7位數字_名稱_數字，後面可能接縣市
+  const chtMatches2 = [...fullText.matchAll(/(?<![A-Z])(\d{7}_[\w\u4e00-\u9fff\(\)\-]+)\s*[\s　]*([\u4e00-\u9fff]{2,4}[市縣][\u4e00-\u9fff]*)?/g)];
+  chtMatches2.forEach(m => {
+    const id = m[1].trim();
+    const city = m[2] ? m[2].trim() : '';
+    if (id && !id.includes('MK-DM')) usedKeys.push({ telecom:'中華', id, city });
+  });
+
+  return { clientName, sendDate, usedKeys };
+}
+
+// ═══ Used set helpers ════════════════════════════════
+function getUsedSet(clientName) {
+  const s = new Set();
+  // Check if it's a sub-order view (name|order|idx)
+  const subMatch = clientName.match(/^(.+)\|order\|(\d+)$/);
+  if (subMatch) {
+    const name = subMatch[1];
+    const idx = parseInt(subMatch[2]);
+    if (clients[name] && clients[name].orders[idx]) {
+      clients[name].orders[idx].usedKeys.forEach(k => s.add(key(k)));
+    }
+    return s;
+  }
+  if (!clients[clientName]) return s;
+  clients[clientName].orders.forEach(o => o.usedKeys.forEach(k => s.add(key(k))));
+  return s;
+}
+
+function getBaseClientName(name) {
+  const m = name.match(/^(.+)\|order\|\d+$/);
+  return m ? m[1] : name;
+}
+
+function getAllUsedSet() {
+  const s = new Set();
+  Object.values(clients).forEach(c => c.orders.forEach(o => o.usedKeys.forEach(k => s.add(key(k)))));
+  return s;
+}
+
+function key(k) {
+  if (k.telecom==='遠傳') return `遠傳||${k.id}`;
+  if (k.telecom==='台哥大') return `台哥大|${k.city}|${k.id}`;
+  return `中華||${k.id}`;
+}
+
+function rowKey(r) { return key({ telecom: r.telecom, id: r.id, city: r.city }); }
+
+function isUsed(row, usedSet) { return usedSet.has(rowKey(row)); }
+
+function usedByClients(row) {
+  return Object.entries(clients)
+    .filter(([, c]) => c.orders.some(o => o.usedKeys.some(k => key(k) === rowKey(row))))
+    .map(([name]) => name);
+}
+
+// ═══ Render ══════════════════════════════════════════
+function renderSetupOrMain() {
+  document.getElementById('setup-view').innerHTML = '';
+  renderMain();
+}
+
+function renderClientList() {
+  const el = document.getElementById('client-list');
+  const names = Object.keys(clients);
+  if (!names.length) { el.innerHTML = '<div style="font-size:12px;color:#bbb;padding:8px 4px">上傳訂單後自動建立</div>'; return; }
+  el.innerHTML = names.map(name => {
+    const usedSet = getUsedSet(name);
+    const isExpanded = currentClient && currentClient.startsWith(name + '|') || currentClient === name;
+    const orders = clients[name].orders;
+    const activeClass = (currentClient === name) ? ' active' : '';
+    let html = `<div class="client-item${activeClass}" onclick="selectClient('${name}')">
+      <div class="c-avatar">${name.slice(-2)}</div>
+      <div style="flex:1;min-width:0">
+        <div class="c-name">${name}</div>
+        <div class="c-meta">${orders.length} 張訂單 · ${usedSet.size} 筆已用</div>
+      </div>
+      <span style="font-size:11px;color:#999">${isExpanded ? '▲' : '▼'}</span>
+    </div>`;
+    if (isExpanded && orders.length > 0) {
+      html += orders.map((o, i) => {
+        const subKey = name + '|order|' + i;
+        const subActive = currentClient === subKey ? ' active' : '';
+        return `<div class="client-item${subActive}" style="padding-left:24px" onclick="selectClientOrder('${name}', ${i})">
+          <div class="c-avatar" style="width:22px;height:22px;font-size:10px;background:#f0f0ec;color:#666">${o.sendDate ? o.sendDate.split('-')[0] : '—'}</div>
+          <div style="flex:1;min-width:0">
+            <div class="c-name" style="font-size:12px">${o.sendDate || o.filename}</div>
+            <div class="c-meta">${o.usedKeys.length} 筆</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    return html;
+  }).join('');
+}
+
+function selectClient(name) { currentClient = name; currentTab = 'all'; usedViewMode = 'client'; currentPage = 1; searchKeyword = ''; const sb = document.getElementById('search-box'); if(sb) sb.value=''; renderClientList(); renderMain(); }
+
+function selectClientOrder(name, orderIdx) {
+  currentClient = name + '|order|' + orderIdx;
+  currentTab = 'all'; usedViewMode = 'client'; currentPage = 1;
+  renderClientList(); renderMain();
+}
+
+function renderMain() {
+  const el = document.getElementById('main-content');
+  if (!allData.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📂</div><div class="empty-title">請先上傳電信數據</div><div class="empty-desc">左側上傳「電信 Excel 總表」<br>再上傳客戶 Word 訂單</div></div>`;
+    return;
+  }
+  if (!currentClient) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📄</div><div class="empty-title">請上傳訂單</div><div class="empty-desc">上傳 Word 訂單後，系統自動辨識客戶並建立紀錄</div></div>`;
+    return;
+  }
+
+  const clientUsedSet = getUsedSet(currentClient);
+  const allUsedSet = getAllUsedSet();
+  const activeSet = usedViewMode === 'client' ? clientUsedSet : allUsedSet;
+
+  // Filter by tab
+  const kw = searchKeyword.toLowerCase();
+  let rows = allData.filter(r => {
+    if (kw && !r.id.toLowerCase().includes(kw) && !(r.fname||'').toLowerCase().includes(kw) && !r.city.includes(kw)) return false;
+    if (currentTab === 'cht') return r.telecom === '中華';
+    if (currentTab === 'twd') return r.telecom === '台哥大';
+    if (currentTab === 'fet') return r.telecom === '遠傳';
+    if (currentTab === 'used') return isUsed(r, activeSet);
+    if (currentTab === 'avail') return !isUsed(r, activeSet);
+    return true;
+  });
+  // Apply search filter
+  if (searchKeyword) {
+    const kw = searchKeyword.toLowerCase();
+    rows = rows.filter(r =>
+      (r.id||'').toLowerCase().includes(kw) ||
+      (r.fname||'').toLowerCase().includes(kw) ||
+      (r.city||'').toLowerCase().includes(kw)
+    );
+  }
+
+  const totalUsed = allData.filter(r => isUsed(r, activeSet)).length;
+  const totalAvail = allData.length - totalUsed;
+  const availTotal = allData.filter(r => !isUsed(r, activeSet)).reduce((s,r) => s+r.count, 0);
+  const clientOrders = clients[currentClient]?.orders || [];
+  const clientFeedback = feedback.filter(f => f.clientName === currentClient);
+
+  // Orders section
+  const ordersHtml = clientOrders.length ? `
+    <div class="section-card">
+      <h3>📋 訂單紀錄 <span style="font-size:11px;color:#999;font-weight:400">${clientOrders.length} 張</span></h3>
+      ${clientOrders.map((o,i) => `
+        <div class="order-item">
+          <span class="order-date">${o.date}</span>
+          <span class="order-name">${o.filename}</span>
+          <span class="order-count">${o.usedKeys.length} 筆</span>
+          <button class="icon-btn" onclick="deleteOrder(${i})" title="刪除此訂單紀錄">✕</button>
+        </div>`).join('')}
+    </div>` : '';
+
+  // Feedback section
+  const fbHtml = clientFeedback.length ? `
+    <div class="section-card">
+      <h3>💬 客戶反饋 <span style="font-size:11px;color:#999;font-weight:400">${clientFeedback.length} 筆</span></h3>
+      ${clientFeedback.map(f => `
+        <div class="order-item">
+          <span class="order-date">${f.date}</span>
+          <span class="badge ${f.rating==='好'?'b-good':'b-bad'}" style="flex-shrink:0">${f.rating==='好'?'👍 好':'👎 差'}</span>
+          <span class="order-name" title="${f.id}">${f.telecom} · ${f.id.slice(0,18)}… · ${f.city||'—'}</span>
+          <span style="font-size:11px;color:#888;flex-shrink:0">${f.note||''}</span>
+          <button class="icon-btn" onclick="deleteFeedback(${f.rowIndex})" title="刪除">✕</button>
+        </div>`).join('')}
+    </div>` : '';
+
+  // Pagination
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE);
+  if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
+  const pageRows = rows.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE);
+
+  // Table rows (only current page)
+  const tableRows = pageRows.map(r => {
+    const used = isUsed(r, activeSet);
+    const tel = r.telecom==='中華'?'b-cht':r.telecom==='台哥大'?'b-twd':'b-fet';
+    const whoUsed = usedByClients(r);
+    const baseClient = getBaseClientName(currentClient);
+    const fb = feedback.filter(f => f.id === r.id && f.city === r.city && f.clientName === baseClient);
+    const fbBadge = fb.length ? `<span class="badge ${fb[0].rating==='好'?'b-good':'b-bad'}" style="margin-left:4px">${fb[0].rating==='好'?'👍':'👎'}</span>` : '';
+    return `<tr class="${used?'used-row':''}">
+      <td style="font-size:12px;word-break:break-all;">${r.fname||'—'}</td>
+      <td class="id-cell" style="font-size:11px;font-family:monospace;word-break:break-all;">${r.id}</td>
+      <td><span class="badge ${tel}">${r.telecom}</span></td>
+      <td>${r.city}</td>
+      <td style="text-align:right">${r.count.toLocaleString()}</td>
+      <td style="color:#666;font-size:12px">${r.sendDate||'—'}</td>
+      <td>
+        ${used
+          ? `<span class="status-dot dot-r"></span><span style="color:#dc2626;font-size:12px">已使用</span>${usedViewMode==='all'&&whoUsed.length?`<span style="font-size:11px;color:#aaa"> (${whoUsed.join('、')})</span>`:''}`
+          : `<span class="status-dot dot-g"></span><span style="color:#16a34a;font-size:12px">可使用</span>`}
+        ${fbBadge}
+      </td>
+      <td style="text-align:center">
+        <button class="btn btn-icon" onclick='openFeedback(${JSON.stringify(r)})' title="新增反饋">💬</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Pagination controls
+  const pageInfo = rows.length > 0 ? `第 ${currentPage} / ${totalPages} 頁（共 ${rows.length} 筆）` : '';
+  const paginationHtml = totalPages > 1 ? `
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-top:1px solid #f0f0ec;">
+      <button class="btn" onclick="goPage(1)" ${currentPage===1?'disabled':''}>«</button>
+      <button class="btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹ 上一頁</button>
+      <span style="font-size:13px;color:#666">${pageInfo}</span>
+      <button class="btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>下一頁 ›</button>
+      <button class="btn" onclick="goPage(${totalPages})" ${currentPage===totalPages?'disabled':''}>»</button>
+    </div>` : '';
+
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1>${currentClient}</h1>
+        <p>共 ${allData.length} 筆 · 已使用 ${totalUsed} 筆 · 剩餘 ${totalAvail} 筆可用</p>
+      </div>
+      <button class="btn btn-dark" onclick="exportExcel()">⬇ 匯出標記 Excel</button>
+    </div>
+
+    ${ordersHtml}${fbHtml}
+
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">可使用筆數</div><div class="stat-value green">${totalAvail.toLocaleString()}</div></div>
+      <div class="stat-card"><div class="stat-label">已使用筆數</div><div class="stat-value red">${totalUsed.toLocaleString()}</div></div>
+      <div class="stat-card"><div class="stat-label">可用數據量</div><div class="stat-value blue">${availTotal.toLocaleString()}</div></div>
+      <div class="stat-card"><div class="stat-label">客戶反饋筆數</div><div class="stat-value">${clientFeedback.length}</div></div>
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <input type="text" id="search-box" placeholder="🔍 搜尋特篩編號、檔名、縣市..." oninput="doSearch(this.value)"
+        style="width:100%;border:1.5px solid #e0e0e0;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;font-family:inherit;"
+        onfocus="this.style.borderColor='#1a1a1a'" onblur="this.style.borderColor='#e0e0e0'">
+    </div>
+    <div style="margin-bottom:10px;">
+      <input type="text" id="search-box" placeholder="🔍 搜尋特篩編號、檔名、縣市..." value="${searchKeyword}"
+        oninput="setSearch(this.value)"
+        style="width:100%;border:1px solid #e0e0e0;border-radius:7px;padding:8px 12px;font-size:13px;outline:none;font-family:inherit;">
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <div class="tabs">
+        <button class="tab-btn ${currentTab==='all'?'active':''}" onclick="switchTab('all')">全部 (${allData.length})</button>
+        <button class="tab-btn ${currentTab==='avail'?'active':''}" onclick="switchTab('avail')">可使用 (${totalAvail})</button>
+        <button class="tab-btn ${currentTab==='used'?'active':''}" onclick="switchTab('used')">已使用 (${totalUsed})</button>
+        <button class="tab-btn ${currentTab==='cht'?'active':''}" onclick="switchTab('cht')">中華</button>
+        <button class="tab-btn ${currentTab==='twd'?'active':''}" onclick="switchTab('twd')">台哥大</button>
+        <button class="tab-btn ${currentTab==='fet'?'active':''}" onclick="switchTab('fet')">遠傳</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;color:#999">已使用視角：</span>
+        <div class="view-toggle">
+          <button class="view-btn ${usedViewMode==='client'?'active':''}" onclick="setViewMode('client')">此客戶</button>
+          <button class="view-btn ${usedViewMode==='all'?'active':''}" onclick="setViewMode('all')">全客戶</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>檔名</th><th>特篩編號</th><th>電信</th><th>縣市</th>
+          <th style="text-align:right">數據量</th><th>發送日期</th><th>狀態</th><th style="text-align:center">反饋</th>
+        </tr></thead>
+        <tbody>${tableRows || `<tr><td colspan="8"><div class="empty" style="padding:28px">沒有符合的數據</div></td></tr>`}</tbody>
+      </table>
+      ${paginationHtml}
+    </div>`;
+}
+
+function doSearch(val) {
+  searchKeyword = val.trim();
+  currentPage = 1;
+  renderMain();
+}
+function setSearch(v) { searchKeyword = v; currentPage = 1; renderMain(); }
+function goPage(p) { currentPage = p; renderMain(); document.getElementById('main-content').scrollIntoView({behavior:'smooth'}); }
+function switchTab(t) { currentTab=t; currentPage=1; renderMain(); }
+function setViewMode(m) { usedViewMode=m; currentPage=1; renderMain(); }
+
+// ═══ Delete order ════════════════════════════════════
+async function deleteOrder(idx) {
+  if (!confirm('確定刪除此訂單紀錄？')) return;
+  const order = clients[currentClient].orders[idx];
+  clients[getBaseClientName(currentClient)].orders.splice(idx, 1);
+  saveRecords();
+  renderClientList(); renderMain();
+  showToast('已刪除訂單紀錄');
+}
+
+// ═══ Feedback ════════════════════════════════════════
+function openFeedback(row) {
+  feedbackTarget = row; feedbackRating = '';
+  document.getElementById('feedback-target').textContent =
+    `${row.telecom} · ${row.id} · ${row.city}`;
+  document.getElementById('feedback-note').value = '';
+  document.getElementById('btn-good').classList.remove('selected');
+  document.getElementById('btn-bad').classList.remove('selected');
+  document.getElementById('feedback-modal').style.display = 'flex';
+}
+
+function closeFeedback() { document.getElementById('feedback-modal').style.display='none'; }
+
+function selectRating(r) {
+  feedbackRating = r;
+  document.getElementById('btn-good').classList.toggle('selected', r==='好');
+  document.getElementById('btn-bad').classList.toggle('selected', r==='差');
+}
+
+async function submitFeedback() {
+  if (!feedbackRating) { showToast('請選擇評價'); return; }
+  const note = document.getElementById('feedback-note').value.trim();
+  const fb = { clientName: currentClient, telecom: feedbackTarget.telecom, id: feedbackTarget.id, city: feedbackTarget.city, rating: feedbackRating, note };
+  feedback.push({ ...fb, date: todayStr(), rowIndex: feedback.length });
+  saveRecords();
+  closeFeedback(); renderMain();
+  showToast('✓ 反饋已儲存');
+}
+
+async function deleteFeedback(rowIndex) {
+  if (!confirm('確定刪除此反饋？')) return;
+  feedback = feedback.filter(f => f.rowIndex !== rowIndex);
+  saveRecords();
+  renderMain();
+  showToast('已刪除反饋');
+}
+
+// ═══ Export Excel ════════════════════════════════════
+function exportExcel() {
+  if (!rawWorkbookData) return showToast('請先上傳電信 Excel');
+  if (!currentClient) return showToast('請先選擇客戶');
+  const clientSet = getUsedSet(currentClient);
+
+  // Load original workbook to preserve all sheets and formatting structure
+  const wb = XLSX.read(rawWorkbookData, { type: 'array', cellStyles: true });
+  const telecomSheets = { '中華--借貸':'中華', '台哥大--借貸':'台哥大', '遠傳--借貸':'遠傳' };
+  const RED_BG = 'FFFF9999'; // light red
+
+  Object.entries(telecomSheets).forEach(([sname, telecom]) => {
+    const ws = wb.Sheets[sname];
+    if (!ws) return;
+
+    // Find header row to locate 特篩編號 and 基本/帳址 columns
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    let idCol = -1, cityCol = -1;
+
+    // Scan row 1 for headers
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
+      const val = cell ? String(cell.v || '') : '';
+      if (val.includes('特篩編號') || val.includes('檔名')) idCol = c;
+      if (val.includes('基本') || val.includes('帳址')) cityCol = c;
+    }
+    if (idCol < 0 || cityCol < 0) return;
+
+    // Mark used rows red
+    for (let r = 1; r <= range.e.r; r++) {
+      const idCell = ws[XLSX.utils.encode_cell({ r, c: idCol })];
+      const cityCell = ws[XLSX.utils.encode_cell({ r, c: cityCol })];
+      if (!idCell || !idCell.v) continue;
+      const rowData = { id: String(idCell.v).trim(), telecom, city: cityCell ? String(cityCell.v || '').trim() : '' };
+      if (!isUsed(rowData, clientSet)) continue;
+
+      // Apply red background to all cells in this row
+      for (let c = range.s.c; c <= range.e.c; c++) {
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+        ws[addr].s = { fill: { fgColor: { rgb: RED_BG }, patternType: 'solid' }, font: { color: { rgb: 'FF990000' } } };
+      }
+    }
+  });
+
+  XLSX.writeFile(wb, `電信數據_${currentClient}_${todayStr().replace(/\//g,'-')}.xlsx`, { cellStyles: true });
+  showToast(`✓ 已匯出標記 Excel（${currentClient} 已用過的列標紅色）`);
+}
+
+// ═══ Setup guide ════════════════════════════════════
+function setupGuideHtml() {
+  return `<div style="max-width:560px;margin:0 auto;padding-top:8px">
+    <div class="section-card" style="margin-bottom:0">
+      <h3>🚀 第一次設定教學</h3>
+      <p style="font-size:13px;color:#666;margin-bottom:16px">只需設定一次，之後直接使用。</p>
+      <div class="setup-step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>開啟 Google Sheets Apps Script</h4>
+          <p>打開你的 <a href="https://docs.google.com/spreadsheets/d/1nnS66uG-Sc5noiUXgsuygA7SazvAqIDU7ZWVLsBONVY/edit" target="_blank" style="color:#2563eb">電信數據紀錄試算表</a>，點上方「擴充功能」→「Apps Script」</p>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>貼上程式碼</h4>
+          <p>把編輯器裡的內容全部刪掉，貼上我提供的 <strong>Google_Apps_Script.js</strong> 的內容，然後按「儲存」💾</p>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>部署為網路應用程式</h4>
+          <p>點右上角「部署」→「新增部署作業」→ 類型選「網路應用程式」<br>執行身分選「我」，存取權選「所有人」→ 按「部署」→ 複製網址</p>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div class="step-num">4</div>
+        <div class="step-content">
+          <h4>貼上網址到上方輸入框</h4>
+          <p>把複製的網址貼到頁面最上方的輸入框，按「連線測試」，看到綠燈就完成了！</p>
+          <div class="code-block">https://script.google.com/macros/s/AKfy.../exec</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ═══ Utils ══════════════════════════════════════════
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
