@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>電信數據管理系統</title>
+</head>
+<body>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Microsoft JhengHei',sans-serif;background:#f5f4f0;color:#1a1a1a;font-size:14px}
+.topbar{background:#1a1a1a;color:#fff;padding:0 20px;height:50px;display:flex;align-items:center;justify-content:space-between}
+.topbar-title{font-size:14px;font-weight:500}
+.topbar-btns{display:flex;gap:6px}
+.tbtn{padding:4px 10px;border:1px solid rgba(255,255,255,.3);border-radius:5px;background:transparent;color:#fff;font-size:11px;cursor:pointer;font-family:inherit}
+.tbtn:hover{background:rgba(255,255,255,.1)}
+.layout{display:grid;grid-template-columns:230px 1fr;min-height:calc(100vh - 50px)}
+.sidebar{background:#fff;border-right:1px solid #e8e8e8;padding:14px;display:flex;flex-direction:column;gap:5px;overflow-y:auto}
+.sec-lbl{font-size:10px;font-weight:600;color:#999;letter-spacing:.07em;text-transform:uppercase;margin:8px 0 3px}
+.upzone{border:1.5px dashed #d0d0d0;border-radius:8px;padding:12px;text-align:center;cursor:pointer;position:relative;background:#fafaf8}
+.upzone:hover{border-color:#1a1a1a;background:#f5f4f0}
+.upzone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upzone-lbl{font-size:11px;color:#666}
+.upzone-lbl strong{display:block;font-size:12px;color:#1a1a1a;margin-bottom:2px}
+.pill{background:#f0f0ec;border-radius:5px;padding:4px 8px;font-size:10px;display:flex;align-items:center;gap:4px;margin-top:3px;color:#444}
+.pill-dot{width:5px;height:5px;border-radius:50%;background:#22c55e;flex-shrink:0}
+.ci{padding:7px 8px;border-radius:7px;cursor:pointer;display:flex;align-items:center;gap:7px}
+.ci:hover{background:#f5f4f0}
+.ci.active{background:#1a1a1a;color:#fff}
+.c-av{width:26px;height:26px;border-radius:50%;background:#e8e4ff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#5b45c4;flex-shrink:0}
+.ci.active .c-av{background:rgba(255,255,255,.15);color:#fff}
+.c-name{font-size:12px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c-meta{font-size:10px;color:#999}
+.ci.active .c-meta{color:rgba(255,255,255,.6)}
+.c-sub{padding:4px 8px 4px 24px;border-radius:7px;cursor:pointer;display:flex;align-items:center;gap:5px}
+.c-sub:hover{background:#f5f4f0}
+.c-sub.active{background:#e8e4ff}
+.c-sub-date{font-size:11px;color:#666;flex:1}
+.c-sub.active .c-sub-date{color:#5b45c4;font-weight:500}
+.main{padding:20px;overflow-y:auto}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.stat{background:#fff;border-radius:8px;padding:12px 14px;border:1px solid #eee}
+.stat-lbl{font-size:10px;color:#999;margin-bottom:3px}
+.stat-val{font-size:20px;font-weight:600}
+.g{color:#16a34a}.r{color:#dc2626}.b{color:#2563eb}
+.tabs{display:flex;gap:2px;background:#f0f0ec;border-radius:7px;padding:3px;width:fit-content;margin-bottom:10px}
+.tab{padding:4px 12px;border-radius:5px;border:none;background:none;font-size:11px;cursor:pointer;color:#666;font-family:inherit}
+.tab.active{background:#fff;color:#1a1a1a;font-weight:500;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.row-btns{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px}
+.vt{display:flex;gap:2px;background:#f0f0ec;border-radius:7px;padding:2px}
+.vtb{padding:4px 10px;border-radius:5px;border:none;background:none;font-size:11px;cursor:pointer;color:#666;font-family:inherit}
+.vtb.active{background:#fff;color:#1a1a1a;font-weight:500}
+.search-wrap{margin-bottom:10px}
+.search-wrap input{width:100%;border:1px solid #e0e0e0;border-radius:7px;padding:7px 12px;font-size:12px;outline:none;font-family:inherit}
+.search-wrap input:focus{border-color:#1a1a1a}
+.tbl-wrap{background:#fff;border-radius:8px;border:1px solid #eee;overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+th{text-align:left;padding:7px 10px;font-size:9px;font-weight:600;color:#999;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid #f0f0ec;background:#fafaf8}
+td{padding:7px 10px;border-bottom:1px solid #f5f5f2;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis}
+tr.used td{color:#bbb}
+tr.used .id-col{text-decoration:line-through}
+tr:hover td{background:#fafaf8}
+tr:last-child td{border-bottom:none}
+.bdg{display:inline-flex;padding:1px 6px;border-radius:99px;font-size:9px;font-weight:500}
+.b-cht{background:#dbeafe;color:#1d4ed8}
+.b-twd{background:#fef9c3;color:#854d0e}
+.b-fet{background:#dcfce7;color:#166534}
+.b-good{background:#dcfce7;color:#166534}
+.b-bad{background:#fee2e2;color:#991b1b}
+.sdot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:3px}
+.dg{background:#22c55e}.dr{background:#ef4444}
+.pager{display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;border-top:1px solid #f0f0ec}
+.pager button{padding:3px 8px;border:1px solid #e0e0e0;border-radius:5px;background:#fff;font-size:10px;cursor:pointer;font-family:inherit}
+.pager button:disabled{opacity:.4;cursor:default}
+.pager span{font-size:10px;color:#666}
+.icon-btn{background:none;border:none;cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px;color:#ccc}
+.icon-btn:hover{color:#dc2626;background:#fee2e2}
+.fb-btn{background:none;border:1px solid #e0e0e0;border-radius:4px;cursor:pointer;font-size:10px;padding:2px 6px;color:#666;font-family:inherit}
+.card{background:#fff;border-radius:8px;border:1px solid #eee;padding:12px 14px;margin-bottom:12px}
+.card h4{font-size:11px;font-weight:600;color:#555;margin-bottom:8px}
+.order-row{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:10px;border-bottom:1px solid #f0f0ec}
+.order-row:last-child{border-bottom:none}
+.empty{text-align:center;padding:40px;color:#aaa}
+.empty-icon{font-size:32px;margin-bottom:10px}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;border-radius:12px;padding:20px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+.modal h3{font-size:15px;font-weight:600;margin-bottom:14px}
+.form-lbl{font-size:11px;font-weight:500;color:#555;margin-bottom:5px;display:block}
+.form-input{width:100%;border:1px solid #e0e0e0;border-radius:7px;padding:8px 10px;font-size:12px;outline:none;font-family:inherit}
+textarea.form-input{resize:vertical;min-height:70px}
+.rating-row{display:flex;gap:6px;margin-bottom:12px}
+.rb{flex:1;padding:8px;border-radius:7px;border:1.5px solid #e0e0e0;background:#fff;cursor:pointer;font-size:12px;font-family:inherit}
+.rb.good.sel{background:#dcfce7;border-color:#16a34a;color:#16a34a;font-weight:500}
+.rb.bad.sel{background:#fee2e2;border-color:#dc2626;color:#dc2626;font-weight:500}
+.modal-footer{display:flex;gap:6px;justify-content:flex-end;margin-top:14px}
+.btn{padding:7px 14px;border-radius:7px;border:1px solid #e0e0e0;background:#fff;font-size:12px;cursor:pointer;font-family:inherit}
+.btn-dark{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.toast{position:fixed;bottom:20px;right:20px;background:#1a1a1a;color:#fff;padding:10px 16px;border-radius:7px;font-size:12px;z-index:999;opacity:0;transform:translateY(6px);transition:all .2s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+</style>
+
+<div class="topbar">
+  <span class="topbar-title">📡 電信數據管理系統</span>
+  <div class="topbar-btns">
+    <button class="tbtn" onclick="exportExcel()">匯出標記Excel</button>
+    <button class="tbtn" onclick="exportRec()">匯出紀錄</button>
+    <label class="tbtn" style="cursor:pointer">匯入紀錄<input type="file" accept=".json" style="display:none" onchange="importRec(this)"></label>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sec-lbl">電信數據</div>
+    <div class="upzone">
+      <input type="file" id="excel-input" accept=".xlsx,.xls">
+      <div class="upzone-lbl"><strong>上傳電信 Excel</strong>三家電信合併總表</div>
+    </div>
+    <div id="excel-pill"></div>
+
+    <div class="sec-lbl">上傳訂單</div>
+    <div class="upzone">
+      <input type="file" id="word-input" accept=".docx,.doc" multiple>
+      <div class="upzone-lbl"><strong>丟入 Word 訂單</strong>自動辨識客戶，可多選</div>
+    </div>
+    <div id="word-pills"></div>
+
+    <div class="sec-lbl">客戶列表</div>
+    <div id="client-list"><div style="font-size:10px;color:#bbb;padding:5px">上傳訂單後自動建立</div></div>
+  </div>
+  <div class="main" id="main-content"></div>
+</div>
+
+<div class="overlay" id="fb-modal" style="display:none">
+  <div class="modal">
+    <h3>新增客戶反饋</h3>
+    <div id="fb-target" style="background:#f5f4f0;border-radius:7px;padding:8px 12px;font-size:11px;color:#666;margin-bottom:14px"></div>
+    <div class="form-lbl">評價</div>
+    <div class="rating-row">
+      <button class="rb good" id="btn-good" onclick="selRating('好')">👍 效果好</button>
+      <button class="rb bad" id="btn-bad" onclick="selRating('差')">👎 效果差</button>
+    </div>
+    <div class="form-lbl">備註（選填）</div>
+    <textarea class="form-input" id="fb-note" placeholder="例如：轉換率高、不要再用這區域..."></textarea>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeFb()">取消</button>
+      <button class="btn btn-dark" onclick="submitFb()">儲存</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+var allData = [];
+var clients = {};
+var feedback = [];
+var currentClient = null;
+var currentTab = 'all';
+var usedMode = 'client';
+var currentPage = 1;
+var searchKw = '';
+var fbTarget = null;
+var fbRating = '';
+var rawWb = null;
+var XLSX_LIB = null;
+var JSZIP_LIB = null;
+var PAGE_SIZE = 100;
+
+function loadScript(src, cb) {
+  var s = document.createElement('script');
+  s.src = src;
+  s.onload = cb;
+  s.onerror = function() { showToast('載入函式庫失敗'); };
+  document.head.appendChild(s);
+}
+
+function initLibs(cb) {
+  if (XLSX_LIB && JSZIP_LIB) { cb(); return; }
+  loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', function() {
+    XLSX_LIB = window.XLSX;
+    loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', function() {
+      JSZIP_LIB = window.JSZip;
+      cb();
+    });
+  });
+}
+
+function showToast(m) {
+  var t = document.getElementById('toast');
+  t.textContent = m;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2500);
+}
+
+function loadStorage() {
+  try {
+    var d = localStorage.getItem('tc_data');
+    if (d) {
+      var p = JSON.parse(d);
+      clients = p.c || {};
+      feedback = p.f || [];
+      var n = Object.keys(clients);
+      if (n.length) currentClient = n[0];
+    }
+  } catch(e) {}
+  renderClientList();
+  renderMain();
+}
+
+function saveStorage() {
+  try { localStorage.setItem('tc_data', JSON.stringify({c: clients, f: feedback})); } catch(e) {}
+}
+
+window.onload = function() {
+  document.getElementById('excel-input').addEventListener('change', function() { loadExcel(this); });
+  document.getElementById('word-input').addEventListener('change', function() { loadWords(this); });
+  initLibs(loadStorage);
+};
+
+function loadExcel(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      rawWb = e.target.result;
+      var wb = XLSX_LIB.read(rawWb, {type: 'array'});
+      var map = {'中華--借貸': '中華', '台哥大--借貸': '台哥大', '遠傳--借貸': '遠傳'};
+      allData = [];
+      Object.keys(map).forEach(function(sn) {
+        var tel = map[sn];
+        if (wb.SheetNames.indexOf(sn) < 0) return;
+        var rows = XLSX_LIB.utils.sheet_to_json(wb.Sheets[sn], {defval: ''});
+        rows.forEach(function(row) {
+          var id = String(row['特篩編號'] || row['檔名'] || '').trim();
+          var city = String(row['基本/帳址'] || row['基本帳址'] || '').trim();
+          if (!id || !city) return;
+          allData.push({
+            id: id,
+            fname: String(row['檔名'] || '').trim(),
+            tel: tel,
+            city: city,
+            count: parseInt(row['數據']) || 0,
+            sendDate: String(row['發送日期'] || '').trim()
+          });
+        });
+      });
+      document.getElementById('excel-pill').innerHTML = '<div class="pill"><span class="pill-dot"></span>' + file.name + ' (' + allData.length + '筆)</div>';
+      currentPage = 1;
+      renderMain();
+      showToast('✓ 讀取 ' + allData.length + ' 筆數據');
+    } catch(e) { showToast('Excel讀取失敗：' + e.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function loadWords(input) {
+  var files = Array.from(input.files);
+  if (!files.length) return;
+  var el = document.getElementById('word-pills');
+  el.innerHTML = '<div class="pill">解析中...</div>';
+  var idx = 0;
+  function next() {
+    if (idx >= files.length) {
+      saveStorage();
+      renderClientList();
+      renderMain();
+      showToast('✓ 已載入 ' + files.length + ' 份訂單');
+      return;
+    }
+    var file = files[idx++];
+    parseDoc(file, function(result, err) {
+      if (err) {
+        el.innerHTML += '<div class="pill" style="color:#dc2626">❌ ' + file.name + ': ' + err + '</div>';
+      } else {
+        var cn = result.cn, sd = result.sd, ks = result.ks;
+        if (!clients[cn]) clients[cn] = {orders: []};
+        var k = cn + '|' + (sd || file.name);
+        if (!clients[cn].orders.find(function(o) { return o.k === k; })) {
+          clients[cn].orders.push({k: k, fn: file.name, dt: todayStr(), sd: sd || file.name, ks: ks});
+        }
+        if (!currentClient) currentClient = cn;
+        el.innerHTML += '<div class="pill"><span class="pill-dot"></span>' + file.name + ' → ' + cn + ' (' + ks.length + '筆)</div>';
+      }
+      next();
+    });
+  }
+  next();
+}
+
+function parseDoc(file, cb) {
+  var isDoc = file.name.toLowerCase().endsWith('.doc');
+  if (isDoc) {
+    var r = new FileReader();
+    r.onload = function(e) {
+      try {
+        var buf = e.target.result;
+        var bytes = new Uint16Array(buf);
+        var s = '';
+        for (var i = 0; i < bytes.length; i++) { if (bytes[i] > 31) s += String.fromCharCode(bytes[i]); }
+        var chunks = s.match(/[\x20-\x7e\u4e00-\u9fff\uff00-\uffef]{2,}/g) || [];
+        cb(extractInfo(chunks.join(' '), file.name), null);
+      } catch(e) { cb(null, e.message); }
+    };
+    r.readAsArrayBuffer(file);
+  } else {
+    var r2 = new FileReader();
+    r2.onload = function(e) {
+      JSZIP_LIB.loadAsync(e.target.result).then(function(zip) {
+        var xmlFile = zip.file('word/document.xml');
+        if (!xmlFile) { cb(null, '無法讀取docx內容'); return; }
+        xmlFile.async('string').then(function(xml) {
+          var nodes = xml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+          var txt = nodes.map(function(n) { return n.replace(/<[^>]+>/g, ''); }).join(' ');
+          cb(extractInfo(txt, file.name), null);
+        });
+      }).catch(function(e) { cb(null, e.message); });
+    };
+    r2.readAsArrayBuffer(file);
+  }
+}
+
+function extractInfo(txt, fname) {
+  var cm = txt.match(/【([^】]+)】/);
+  var cm2 = txt.match(/訂購人[\s\/／公司]*([^\s,，、]{2,10})/);
+  var cn = cm ? cm[1].trim().replace(/^[A-Z0-9]+\s*/, '') : cm2 ? cm2[1].trim() : fname.replace(/\.docx?$/i, '');
+  var dm = txt.match(/發送日期[\/时時間]*\s*([\d\/\.]+)/);
+  var sd = '';
+  if (dm) {
+    var raw = dm[1]; var mm = raw.match(/(\d+)\/(\d+)/);
+    if (mm) {
+      var mo = mm[1];
+      var days = raw.replace(/[^\d\.]/g, '.').split('.').filter(Boolean);
+      sd = days.length >= 2 ? mo + '/' + days[0] + '-' + mo + '/' + days[days.length-1] : mo + '/' + days[0];
+    }
+  }
+  if (!sd) { var fn = fname.match(/(\d{4}-\d{4})/); sd = fn ? fn[1] : ''; }
+  var ks = [];
+  (txt.match(/AA\d+_MK-DM\d+_\d+_\d+/g) || []).forEach(function(id) { ks.push({tel: '遠傳', id: id, city: ''}); });
+  var twdMs = txt.matchAll ? [...txt.matchAll(/MM(\d+)\s*([\u4e00-\u9fff]{2,5}[市縣][\u4e00-\u9fff]*)/g)] : [];
+  twdMs.forEach(function(m) { ks.push({tel: '台哥大', id: 'MM' + m[1], city: m[2]}); });
+  var chtMs = txt.matchAll ? [...txt.matchAll(/(?<![A-Z])(\d{7}_[\w\u4e00-\u9fff()\-]+)\s*([\u4e00-\u9fff]{2,4}[市縣][\u4e00-\u9fff]*)?/g)] : [];
+  chtMs.forEach(function(m) { var id = m[1].trim(); var city = m[2] ? m[2].trim() : ''; if (id && !id.includes('MK-DM')) ks.push({tel: '中華', id: id, city: city}); });
+  return {cn: cn, sd: sd, ks: ks};
+}
+
+function rkey(k) {
+  if (k.tel === '遠傳') return '遠傳||' + k.id;
+  if (k.tel === '台哥大') return '台哥大|' + k.city + '|' + k.id;
+  return '中華||' + k.id;
+}
+function rowKey(r) { return rkey({tel: r.tel, id: r.id, city: r.city}); }
+function getUsedSet(cn) {
+  var s = new Set();
+  var sub = cn.match(/^(.+)\|order\|(\d+)$/);
+  if (sub) { var o = clients[sub[1]] && clients[sub[1]].orders[+sub[2]]; if (o) o.ks.forEach(function(k) { s.add(rkey(k)); }); return s; }
+  if (!clients[cn]) return s;
+  clients[cn].orders.forEach(function(o) { o.ks.forEach(function(k) { s.add(rkey(k)); }); });
+  return s;
+}
+function getAllUsedSet() {
+  var s = new Set();
+  Object.values(clients).forEach(function(c) { c.orders.forEach(function(o) { o.ks.forEach(function(k) { s.add(rkey(k)); }); }); });
+  return s;
+}
+function isUsed(r, s) { return s.has(rowKey(r)); }
+function baseName(cn) { var m = cn.match(/^(.+)\|order\|\d+$/); return m ? m[1] : cn; }
+function whoUsed(r) { return Object.keys(clients).filter(function(n) { return clients[n].orders.some(function(o) { return o.ks.some(function(k) { return rkey(k) === rowKey(r); }); }); }); }
+
+function renderClientList() {
+  var el = document.getElementById('client-list');
+  var names = Object.keys(clients);
+  if (!names.length) { el.innerHTML = '<div style="font-size:10px;color:#bbb;padding:5px">上傳訂單後自動建立</div>'; return; }
+  var bc = currentClient ? baseName(currentClient) : null;
+  el.innerHTML = names.map(function(n) {
+    var us = getUsedSet(n);
+    var exp = bc === n;
+    var ac = currentClient === n ? ' active' : '';
+    var html = '<div class="ci' + ac + '" onclick="selClient(\'' + n + '\')">' +
+      '<div class="c-av">' + n.slice(-2) + '</div>' +
+      '<div style="flex:1;min-width:0"><div class="c-name">' + n + '</div><div class="c-meta">' + clients[n].orders.length + '張·' + us.size + '筆已用</div></div>' +
+      '</div>';
+    if (exp) {
+      html += clients[n].orders.map(function(o, i) {
+        var sk = n + '|order|' + i;
+        var sa = currentClient === sk ? ' active' : '';
+        return '<div class="c-sub' + sa + '" onclick="selOrder(\'' + n + '\',' + i + ')">' +
+          '<span class="c-sub-date">' + (o.sd || o.fn) + '</span>' +
+          '<span style="font-size:9px;color:#999">' + o.ks.length + '筆</span>' +
+          '</div>';
+      }).join('');
+    }
+    return html;
+  }).join('');
+}
+
+function selClient(n) { currentClient = n; currentTab = 'all'; usedMode = 'client'; currentPage = 1; searchKw = ''; renderClientList(); renderMain(); }
+function selOrder(n, i) { currentClient = n + '|order|' + i; currentTab = 'all'; usedMode = 'client'; currentPage = 1; searchKw = ''; renderClientList(); renderMain(); }
+
+function renderMain() {
+  var el = document.getElementById('main-content');
+  if (!allData.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><div>請先上傳電信數據</div></div>'; return; }
+  if (!currentClient) { el.innerHTML = '<div class="empty"><div class="empty-icon">📄</div><div>請上傳訂單</div></div>'; return; }
+  var cUS = getUsedSet(currentClient);
+  var aUS = getAllUsedSet();
+  var actS = usedMode === 'client' ? cUS : aUS;
+  var tU = allData.filter(function(r) { return isUsed(r, actS); }).length;
+  var tA = allData.length - tU;
+  var bn = baseName(currentClient);
+  var orders = clients[bn] ? clients[bn].orders : [];
+  var fbs = feedback.filter(function(f) { return f.cn === bn; });
+  var rows = allData.filter(function(r) {
+    if (currentTab === 'cht') return r.tel === '中華';
+    if (currentTab === 'twd') return r.tel === '台哥大';
+    if (currentTab === 'fet') return r.tel === '遠傳';
+    if (currentTab === 'used') return isUsed(r, actS);
+    if (currentTab === 'av') return !isUsed(r, actS);
+    return true;
+  });
+  if (searchKw) { var kw = searchKw.toLowerCase(); rows = rows.filter(function(r) { return r.id.toLowerCase().indexOf(kw) >= 0 || (r.fname || '').toLowerCase().indexOf(kw) >= 0 || r.city.indexOf(kw) >= 0; }); }
+  var tp = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  if (currentPage > tp) currentPage = tp;
+  var pr = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  var at = allData.filter(function(r) { return !isUsed(r, actS); }).reduce(function(s, r) { return s + r.count; }, 0);
+
+  var oHtml = orders.length ? '<div class="card"><h4>訂單紀錄</h4>' + orders.map(function(o, i) {
+    return '<div class="order-row"><span style="color:#999;min-width:55px">' + o.dt + '</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (o.sd || o.fn) + '</span><span style="color:#999">' + o.ks.length + '筆</span><button class="icon-btn" onclick="delOrder(\'' + bn + '\',' + i + ')">✕</button></div>';
+  }).join('') + '</div>' : '';
+
+  var fHtml = fbs.length ? '<div class="card"><h4>客戶反饋</h4>' + fbs.map(function(f, i) {
+    return '<div class="order-row"><span style="color:#999;min-width:50px">' + f.dt + '</span><span class="bdg ' + (f.r === '好' ? 'b-good' : 'b-bad') + '">' + (f.r === '好' ? '👍' : '👎') + '</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:4px;font-size:10px">' + f.tel + '·' + f.id.slice(0, 14) + '…</span><span style="font-size:9px;color:#999">' + (f.note || '') + '</span><button class="icon-btn" onclick="delFb(' + i + ')">✕</button></div>';
+  }).join('') + '</div>' : '';
+
+  var trows = pr.map(function(r) {
+    var u = isUsed(r, actS);
+    var tc = r.tel === '中華' ? 'b-cht' : r.tel === '台哥大' ? 'b-twd' : 'b-fet';
+    var w = whoUsed(r);
+    var fb = feedback.find(function(f) { return f.id === r.id && f.city === r.city && f.cn === bn; });
+    return '<tr class="' + (u ? 'used' : '') + '">' +
+      '<td style="font-size:10px" title="' + (r.fname || r.id) + '">' + (r.fname || '—') + '</td>' +
+      '<td class="id-col" style="font-size:9px;white-space:normal;word-break:break-all;line-height:1.4">' + r.id + '</td>' +
+      '<td><span class="bdg ' + tc + '">' + r.tel + '</span></td>' +
+      '<td>' + r.city + '</td>' +
+      '<td style="text-align:right">' + r.count.toLocaleString() + '</td>' +
+      '<td style="color:#999;font-size:10px">' + (r.sendDate || '—') + '</td>' +
+      '<td><span class="sdot ' + (u ? 'dr' : 'dg') + '"></span><span style="font-size:10px;color:' + (u ? '#dc2626' : '#16a34a') + '">' + (u ? '已使用' : '可使用') + '</span>' + (u && usedMode === 'all' && w.length ? '<span style="font-size:9px;color:#aaa">(' + w.join('、') + ')</span>' : '') + (fb ? '<span class="bdg ' + (fb.r === '好' ? 'b-good' : 'b-bad') + '" style="margin-left:3px">' + (fb.r === '好' ? '👍' : '👎') + '</span>' : '') + '</td>' +
+      '<td style="text-align:center"><button class="fb-btn" onclick="openFb(' + JSON.stringify(r) + ')">💬</button></td>' +
+      '</tr>';
+  }).join('');
+
+  var pager = tp > 1 ? '<div class="pager"><button onclick="gp(1)" ' + (currentPage === 1 ? 'disabled' : '') + '>«</button><button onclick="gp(' + (currentPage - 1) + ')" ' + (currentPage === 1 ? 'disabled' : '') + '>‹</button><span>第' + currentPage + '/' + tp + '頁(' + rows.length + '筆)</span><button onclick="gp(' + (currentPage + 1) + ')" ' + (currentPage === tp ? 'disabled' : '') + '>›</button><button onclick="gp(' + tp + ')" ' + (currentPage === tp ? 'disabled' : '') + '>»</button></div>' : '';
+
+  el.innerHTML = '<div style="margin-bottom:14px"><div style="font-size:18px;font-weight:600">' + bn + '</div><div style="font-size:11px;color:#999;margin-top:2px">共' + allData.length + '筆·已用' + tU + '筆·可用' + tA + '筆</div></div>' +
+    oHtml + fHtml +
+    '<div class="stats"><div class="stat"><div class="stat-lbl">可使用</div><div class="stat-val g">' + tA.toLocaleString() + '</div></div><div class="stat"><div class="stat-lbl">已使用</div><div class="stat-val r">' + tU.toLocaleString() + '</div></div><div class="stat"><div class="stat-lbl">可用數據量</div><div class="stat-val b">' + at.toLocaleString() + '</div></div><div class="stat"><div class="stat-lbl">反饋筆數</div><div class="stat-val">' + fbs.length + '</div></div></div>' +
+    '<div class="row-btns"><div class="tabs"><button class="tab ' + (currentTab === 'all' ? 'active' : '') + '" onclick="swTab(\'all\')">全部(' + allData.length + ')</button><button class="tab ' + (currentTab === 'av' ? 'active' : '') + '" onclick="swTab(\'av\')">可用(' + tA + ')</button><button class="tab ' + (currentTab === 'used' ? 'active' : '') + '" onclick="swTab(\'used\')">已用(' + tU + ')</button><button class="tab ' + (currentTab === 'cht' ? 'active' : '') + '" onclick="swTab(\'cht\')">中華</button><button class="tab ' + (currentTab === 'twd' ? 'active' : '') + '" onclick="swTab(\'twd\')">台哥大</button><button class="tab ' + (currentTab === 'fet' ? 'active' : '') + '" onclick="swTab(\'fet\')">遠傳</button></div><div style="display:flex;align-items:center;gap:5px"><span style="font-size:10px;color:#999">視角:</span><div class="vt"><button class="vtb ' + (usedMode === 'client' ? 'active' : '') + '" onclick="swMode(\'client\')">此客戶</button><button class="vtb ' + (usedMode === 'all' ? 'active' : '') + '" onclick="swMode(\'all\')">全客戶</button></div></div></div>' +
+    '<div class="search-wrap"><input placeholder="搜尋特篩編號、檔名、縣市..." value="' + searchKw + '" oninput="setKw(this.value)"></div>' +
+    '<div class="tbl-wrap"><table><colgroup><col style="width:13%"><col style="width:21%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:19%"><col style="width:7%"></colgroup><thead><tr><th>檔名</th><th>特篩編號</th><th>電信</th><th>縣市</th><th>數據</th><th>發送日期</th><th>狀態</th><th>反饋</th></tr></thead><tbody>' + (trows || '<tr><td colspan="8"><div class="empty" style="padding:20px">沒有符合的數據</div></td></tr>') + '</tbody></table>' + pager + '</div>';
+}
+
+function swTab(t) { currentTab = t; currentPage = 1; renderMain(); }
+function swMode(m) { usedMode = m; currentPage = 1; renderMain(); }
+function setKw(v) { searchKw = v; currentPage = 1; renderMain(); }
+function gp(p) { currentPage = p; renderMain(); }
+
+function delOrder(cn, i) {
+  if (!confirm('確定刪除？')) return;
+  clients[cn].orders.splice(i, 1);
+  if (currentClient === cn + '|order|' + i) currentClient = cn;
+  saveStorage(); renderClientList(); renderMain(); showToast('已刪除');
+}
+
+function openFb(r) {
+  fbTarget = r; fbRating = '';
+  document.getElementById('fb-target').textContent = r.tel + '·' + r.id + '·' + r.city;
+  document.getElementById('fb-note').value = '';
+  document.getElementById('btn-good').classList.remove('sel');
+  document.getElementById('btn-bad').classList.remove('sel');
+  document.getElementById('fb-modal').style.display = 'flex';
+}
+function closeFb() { document.getElementById('fb-modal').style.display = 'none'; }
+function selRating(r) { fbRating = r; document.getElementById('btn-good').classList.toggle('sel', r === '好'); document.getElementById('btn-bad').classList.toggle('sel', r === '差'); }
+function submitFb() {
+  if (!fbRating) { showToast('請選擇評價'); return; }
+  var bn = baseName(currentClient);
+  feedback.push({cn: bn, tel: fbTarget.tel, id: fbTarget.id, city: fbTarget.city, r: fbRating, note: document.getElementById('fb-note').value.trim(), dt: todayStr()});
+  saveStorage(); closeFb(); renderMain(); showToast('✓ 反饋已儲存');
+}
+function delFb(i) { feedback.splice(i, 1); saveStorage(); renderMain(); showToast('已刪除'); }
+
+function exportRec() {
+  var a = document.createElement('a');
+  a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify({c: clients, f: feedback}, null, 2));
+  a.download = '電信紀錄_' + todayStr().replace(/\//g, '-') + '.json';
+  a.click();
+  showToast('✓ 紀錄已匯出');
+}
+function importRec(input) {
+  var file = input.files[0]; if (!file) return;
+  var r = new FileReader();
+  r.onload = function(e) {
+    try {
+      var d = JSON.parse(e.target.result);
+      clients = d.c || {}; feedback = d.f || [];
+      var n = Object.keys(clients); if (n.length) currentClient = n[0];
+      saveStorage(); renderClientList(); renderMain(); showToast('✓ 紀錄已匯入');
+    } catch(e) { showToast('匯入失敗：' + e.message); }
+  };
+  r.readAsText(file);
+}
+
+function exportExcel() {
+  if (!rawWb) { showToast('請先上傳電信Excel'); return; }
+  if (!currentClient) { showToast('請先選擇客戶'); return; }
+  var cs = getUsedSet(currentClient);
+  var wb = XLSX_LIB.read(rawWb, {type: 'array', cellStyles: true});
+  var RED = 'FFFF9999';
+  ['中華--借貸', '台哥大--借貸', '遠傳--借貸'].forEach(function(sn) {
+    var ws = wb.Sheets[sn]; if (!ws) return;
+    var range = XLSX_LIB.utils.decode_range(ws['!ref'] || 'A1');
+    var ic = -1, cc = -1;
+    for (var c = range.s.c; c <= range.e.c; c++) {
+      var cell = ws[XLSX_LIB.utils.encode_cell({r: 0, c: c})];
+      var v = cell ? String(cell.v || '') : '';
+      if (v.indexOf('特篩編號') >= 0 || v.indexOf('檔名') >= 0) ic = c;
+      if (v.indexOf('基本') >= 0 || v.indexOf('帳址') >= 0) cc = c;
+    }
+    if (ic < 0) return;
+    var tel = sn.indexOf('中華') >= 0 ? '中華' : sn.indexOf('台哥大') >= 0 ? '台哥大' : '遠傳';
+    for (var row = 1; row <= range.e.r; row++) {
+      var iC = ws[XLSX_LIB.utils.encode_cell({r: row, c: ic})];
+      var cC = ws[XLSX_LIB.utils.encode_cell({r: row, c: cc})];
+      if (!iC || !iC.v) continue;
+      var rd = {tel: tel, id: String(iC.v).trim(), city: cC ? String(cC.v || '').trim() : ''};
+      if (!isUsed(rd, cs)) continue;
+      for (var col = range.s.c; col <= range.e.c; col++) {
+        var addr = XLSX_LIB.utils.encode_cell({r: row, c: col});
+        if (!ws[addr]) ws[addr] = {t: 's', v: ''};
+        ws[addr].s = {fill: {fgColor: {rgb: RED}, patternType: 'solid'}, font: {color: {rgb: 'FF990000'}}};
+      }
+    }
+  });
+  var bn = baseName(currentClient);
+  XLSX_LIB.writeFile(wb, '電信數據_' + bn + '_' + todayStr().replace(/\//g, '-') + '.xlsx', {cellStyles: true});
+  showToast('✓ 已匯出標記Excel');
+}
+
+function todayStr() {
+  var d = new Date();
+  return d.getFullYear() + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0');
+}
+</script>
+</body>
+</html>
